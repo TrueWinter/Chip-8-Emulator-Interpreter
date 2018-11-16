@@ -110,7 +110,7 @@ int main(int argc, char* argv[]){
     //Emulation loop
     for(;;){
   
-        //emulateCycle(&CPU);
+        emulateCycle(&CPU);
 
          // Process SDL events
         SDL_Event e;
@@ -141,10 +141,10 @@ int main(int argc, char* argv[]){
         }
 
 
-        if(CPU.key[0] == 1){
-            CPU.key[0] = 0;
-            emulateCycle(&CPU);
-        }
+       // if(CPU.key[0] == 1){
+       //     CPU.key[0] = 0;
+     //       emulateCycle(&CPU);
+     //   }
 
 
 
@@ -164,7 +164,7 @@ int main(int argc, char* argv[]){
             SDL_RenderPresent(renderer);
         }
 
-        //usleep(1000 * 200);
+        usleep(10 * 150);
     }
 
 	return 0;
@@ -249,6 +249,16 @@ void emulateCycle(chip8* CPU){
              printf("8000 RAN\n");
              }
             break;
+
+            //Sets VX to VX & VY
+            case 0x8002:
+            CPU->V[((CPU->opcode & 0x0F00) >> 8)] =  CPU->V[((CPU->opcode & 0x0F00) >> 8)] & CPU->V[((CPU->opcode & 0x00F0) >> 8)];
+            CPU->pc += 2;
+            break;
+
+            default:
+                 printf ("Unknown opcode [0x8000]: 0x%X\n",  CPU->opcode);
+                  exit(3);
          }
         break;
 
@@ -305,10 +315,18 @@ void emulateCycle(chip8* CPU){
         //Add VX to I
         case 0xF000:
             switch(CPU->opcode & 0xF0FF){
+
+                 // FX1E - Adds VX to I
                 case 0xF01E:
-                 CPU->I +=  CPU->V[(CPU->opcode & 0x0F00)];
-                 CPU->pc += 2;
-                break;
+                    // VF is set to 1 when range overflow (I+VX>0xFFF), and 0
+                    // when there isn't.
+                    if(CPU->I + CPU->V[(CPU->opcode & 0x0F00) >> 8] > 0xFFF)
+                        CPU->V[0xF] = 1;
+                    else
+                        CPU->V[0xF] = 0;
+                    CPU->I += CPU->V[(CPU->opcode & 0x0F00) >> 8];
+                    CPU->pc += 2;
+                    break;
 
                 case 0xF007:
                   CPU->V[(CPU->opcode & 0x0F00)] = CPU->delay_timer;
@@ -322,7 +340,7 @@ void emulateCycle(chip8* CPU){
                  CPU->pc += 2;
                 break;
 
-                 case 0x0065: //FX65: Fills V0 to VX with values from memory starting at address I
+                 case 0xF065: //FX65: Fills V0 to VX with values from memory starting at address I
                         for(int i = 0; i <= ((CPU->opcode & 0x0F00) >> 8); i++)
                             CPU->V[i] = CPU->memory[CPU->I + i];
                         CPU->pc += 2;
@@ -418,12 +436,12 @@ void loadProgramIntoMemory(chip8* CPU){
  	printf("\nReading ROM...\n");
 
 	//Read in binary mode
-	fp = fopen("INVADERS", "rb");
-   // fp = fopen("BC_test.ch8", "rb");
+	//fp = fopen("INVADERS", "rb");
+    //fp = fopen("BC_test.ch8", "rb");
+    fp = fopen("Space Invaders.ch8", "rb");
 
 	  if (fp == NULL) {
          printf("Failed to open ROM.\n");
-      //  return false;
     }
 
 	// Get file size
@@ -436,14 +454,12 @@ void loadProgramIntoMemory(chip8* CPU){
     char* rom_buffer = (char*) malloc(sizeof(char) * rom_size);
     if (rom_buffer == NULL) {
         printf("Failed to allocate memory for ROM.\n");
-      //  return false;
     }
 
     // Copy ROM into buffer
     size_t result = fread(rom_buffer, sizeof(char), (size_t)rom_size, fp);
     if (result != rom_size) {
         printf("Failed to read ROM.\n");
-        //return false;
     }
 
     int i;
@@ -451,8 +467,7 @@ void loadProgramIntoMemory(chip8* CPU){
     // Copy buffer to memory
       if ((4096-512) > rom_size){
         for (i = 0; i < rom_size; ++i) {
-            CPU->memory[i + 512] = (uint8_t)rom_buffer[i];   // Load into memory starting
-            // printf("MEM: %d\n",rom_buffer[i]);             // at 0x200 (=512)
+            CPU->memory[i + 512] = (uint8_t)rom_buffer[i];   // Load into memory starting          // at 0x200 (=512)
         }
     }else{
         printf("ROM too large to fit in memory..Size of: %ld/3584", rom_size);
