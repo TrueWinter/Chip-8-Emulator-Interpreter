@@ -228,6 +228,14 @@ void emulateCycle(chip8* CPU){
                 CPU->pc += 2;
             break;
 
+        // 4XNN - Skips the next instruction if VX does not equal NN.
+        case 0x4000:
+            if (CPU->V[(CPU->opcode & 0x0F00) >> 8] != (CPU->opcode & 0x00FF))
+                CPU->pc += 4;
+            else
+                CPU->pc += 2;
+            break;
+
         //Sets VX to NN
         case 0x6000:
             CPU->V[(CPU->opcode & 0x0F00) >> 8] = CPU->opcode & 0x00FF;
@@ -244,16 +252,47 @@ void emulateCycle(chip8* CPU){
          switch(CPU->opcode & 0xF00F){
             //Set VX to VY
             case 0x8000:{
-             CPU->V[(CPU->opcode & 0x0F00) >> 8] = (CPU->V[(CPU->opcode & 0x00F0) >> 4]); //FIGURE OUT WHY 4
-             CPU->pc += 2;
-             printf("8000 RAN\n");
+                 CPU->V[(CPU->opcode & 0x0F00) >> 8] = (CPU->V[(CPU->opcode & 0x00F0) >> 4]); //FIGURE OUT WHY 4
+                 CPU->pc += 2;
              }
             break;
 
             //Sets VX to VX & VY
             case 0x8002:
-            CPU->V[((CPU->opcode & 0x0F00) >> 8)] =  CPU->V[((CPU->opcode & 0x0F00) >> 8)] & CPU->V[((CPU->opcode & 0x00F0) >> 8)];
-            CPU->pc += 2;
+                CPU->V[((CPU->opcode & 0x0F00) >> 8)] =  CPU->V[((CPU->opcode & 0x0F00) >> 8)] & CPU->V[((CPU->opcode & 0x00F0) >> 8)];
+                CPU->pc += 2;
+            break;
+
+            case 0x8003:
+                CPU->V[(CPU->opcode & 0x0F00) >> 8] ^= CPU->V[(CPU->opcode & 0x00F0) >> 4];
+                CPU->pc += 2;
+            break;
+
+            //Adds VY to VX
+            case 0x8004:
+                CPU->V[(CPU->opcode & 0x0F00) >> 8] += CPU->V[(CPU->opcode & 0x00F0) >> 4];
+                    if(CPU->V[(CPU->opcode & 0x00F0) >> 4] > (0xFF - CPU->V[(CPU->opcode & 0x0F00) >> 8]))
+                        CPU->V[0xF] = 1; //carry
+                    else
+                        CPU->V[0xF] = 0;
+                    CPU->pc += 2;
+            break;
+
+            case 0x8005:
+                    if(CPU->V[(CPU->opcode & 0x00F0) >> 4] > CPU->V[(CPU->opcode & 0x0F00) >> 8])
+                        CPU->V[0xF] = 0; // there is a borrow
+                    else
+                        CPU->V[0xF] = 1;
+                    CPU->V[(CPU->opcode & 0x0F00) >> 8] -= CPU->V[(CPU->opcode & 0x00F0) >> 4];
+                    CPU->pc += 2;
+            break;
+
+            case 0x8006:
+                CPU->V[15] = CPU->V[(CPU->opcode & 0x0F00) >> 8] & 0x1;
+                CPU->V[(CPU->opcode & 0x0F00) >> 8] >>= 1;
+                CPU->pc += 2;
+             break;
+
             break;
 
             default:
@@ -305,6 +344,14 @@ void emulateCycle(chip8* CPU){
                      CPU->pc += 2;
                 break;
 
+                //Skips next instruction is key in VX is pressed.
+                case 0xE00E:
+                 if(CPU->key[CPU->V[(CPU->opcode & 0x0F00) >> 8]] == 1)
+                    CPU->pc += 4;
+                 else
+                     CPU->pc += 2;
+                break;
+
                 default:
                  printf ("Unknown opcode [0xE000]: 0x%X\n",  CPU->opcode);
                   exit(3);
@@ -338,6 +385,11 @@ void emulateCycle(chip8* CPU){
                 case 0xF015:
                  CPU->delay_timer = CPU->V[(CPU->opcode & 0x0F00)];
                  CPU->pc += 2;
+                break;
+
+                case 0xF018:
+                    CPU->sound_timer = CPU->V[(CPU->opcode & 0x0F00) >> 8];
+                    CPU->pc += 2;
                 break;
 
                  case 0xF065: //FX65: Fills V0 to VX with values from memory starting at address I
